@@ -1,0 +1,28 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+	<dom-module id="main-element">
+		<link rel="stylesheet" href="main-element.css" />
+		<template>
+			<h2>Choose where to place the file</h2>
+			<br/>
+			<div id="chooseLocation">
+				<div class="optionCont">
+					<div class="optionTxt">
+						File
+					</div>
+					<paper-input label="none" no-label-float disabled value="[[locationName]]"></paper-input>
+					<paper-button on-tap="setLocation" raised>Choose</paper-button>
+				</div>
+			</div>
+			<div id="errorTxt">Something went wrong, please select a different location</div>
+			<paper-button id="createFileButton" raised on-tap="createFile" disabled$="[[buttonDisabled]]">
+				Create File
+			</paper-button>
+		</template>
+	</dom-module>
+	<script src="main-element.js"></script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+﻿.optionCont {
+	display: flex;
+	flex-direction: row;
+	justify-content: flex-start;
+}
+
+	.optionCont paper-button {
+		margin-top: -13px;
+	}
+
+.optionTxt {
+	margin-top: 10px;
+}
+
+paper-input {
+	flex-grow: 100;
+	margin-left:10px;
+	margin-right:10px;
+}
+
+	paper-input-container[disabled] {
+		opacity: 1;
+	}
+
+paper-button {
+	margin-right: 20px;
+}
+
+#createFileButton {
+	background: rgb(38, 153, 244);
+	color: rgb(255, 255, 255);
+	font-weight: bold;
+}
+
+	#createFileButton[disabled] {
+		background: rgb(149, 208, 255);
+	}
+
+#errorTxt {
+	color: rgb(255, 61, 27);
+	margin-bottom: 3px;
+	visibility: hidden;
+}
