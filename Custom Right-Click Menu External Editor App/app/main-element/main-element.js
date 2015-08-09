@@ -58,6 +58,7 @@ Polymer({
 
 	finishWriting: function() {
 		window.onFinish(chrome.fileSystem.retainEntry(window.el.fileEntry));
+		chrome.app.window.current().close();
 	},
 
 	waitForIO: function (writer, callback) {

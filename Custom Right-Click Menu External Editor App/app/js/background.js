@@ -1,10 +1,37 @@
-﻿var files;
+﻿///<reference path="../../references/_references.js"/>
+var files;
 chrome.storage.local.get(function(items) {
 	files = items.files || {};
 });
 var currentlyEditing = [];
 var connections = {};
 var idNum = 0; //Id to keep track of all the connections, each connection gets their own ID
+
+/*
+ * CurrentlyEditing contains all the "file"s currently being edited
+ * 
+ * Each new connections get put in connections with its ID being idNum, having the properties:
+ *		"connecting", containing data about the connection's status (connected, connecting, not connected)
+ *		"id", containg the key to the item from the connections object, this being idNum
+ *		"port", the port on which data can be posted directly to the connection
+ *		"file", containing an object which is also part of the "files" object, this contains the following properties: 
+ *			"code", the code inside the file,
+ *			"connection", a reference to the connection object itself,
+ *			"id", the id for the file itself, the id can request the file using chrome.fileSystem.restoreEntry(id),
+ * 
+ * Any "file" will be saved in chrome.storage.local, whenever a connection asks for a specific file's ID, the connection gets linked to that file
+ * 
+ */
+
+function removeFromArray(array, toRemove) {
+	var len = array.length;
+	for (var i = 0; i < len; i++) {
+		if (array[i] === toRemove) {
+			array.splice(i, 1);
+			break;
+		}
+	}
+}
 
 function chooseFileLocation(name, content, callback) {
 	chrome.app.window.create('../html/chooseFile.html', {
@@ -25,7 +52,6 @@ function chooseFileLocation(name, content, callback) {
 			color: '#FFFFFF'
 		}
 	}, function(createdWindow) {
-		console.log(createdWindow);
 		createdWindow.contentWindow.name = name;
 		createdWindow.contentWindow.content = content;
 		createdWindow.contentWindow.onFinish = callback;
@@ -45,7 +71,8 @@ function connectionHandler(connection, msg) {
 				connection.port.postMessage({
 					status: 'connecting',
 					stage: 1,
-					message: 'hey'
+					message: 'hey',
+					connectionId: connection.id
 				});
 				//Update connection values
 				connection.connection.status = 'connecting';
@@ -57,8 +84,6 @@ function connectionHandler(connection, msg) {
 				connection.connection.status = 'connected';
 				connection.connection.connected = true;
 				connection.connection.stage = 3;
-				console.log('connected');
-				console.log(connection);
 			}
 			break;
 	}
@@ -71,7 +96,11 @@ function deleteDisconnected() {
 	for (connection in connections) {
 		if (connections.hasOwnProperty(connection)) {
 			if (connection.pinging) {
-				delete connections[connection.id];
+				if (connections.file.currentlyEditing) {
+					removeFromArray(currentlyEditing, connections.file);
+					connections.file.currentlyEditing = false;
+					delete connections[connection.id];
+				}
 			}
 		}
 	}
@@ -86,12 +115,17 @@ function ping() {
 			if (connection.connected) {
 				connection.postMessage({
 					status: 'ping',
-					message: 'hello?'
+					message: 'hello?',
+					connectionId: connection.id
 				});
 				connection.pinging = true;
 			}
 		}
 	}
+}
+
+function getFilePath(file, callback) {
+	chrome.fileSystem.getDisplayPath(file, callback);
 }
 
 function getFileEntry(item, callback) {
@@ -135,7 +169,18 @@ function saveCode(item, callback) {
 					}
 				}
 			}
-			filesCopy[item.id].code = code;
+			if (filesCopy[item.id]) {
+				filesCopy[item.id].code = code;
+				files[item.id].code = code;
+			} else {
+				var newFile = {
+					code: code,
+					id: item.id
+				};
+				filesCopy[item.id] = newFile;
+				files[item.id] = newFile;
+			}
+			chrome.storage.local.set({ files: filesCopy });
 			callback(filesCopy);
 		}
 	});
@@ -170,7 +215,8 @@ chrome.notifications.onButtonClicked.addListener(function() {
 		if (connections.hasOwnProperty(connection)) {
 			connection.port.postMessage({
 				status: 'connected',
-				action: 'hideNotifications'
+				action: 'hideNotifications',
+				connectionId: connection.id
 			});
 		}
 	}
@@ -194,9 +240,7 @@ function showConnectedNotification(name, urlPath) {
 
 function waitForIO (writer, callback) {
 	var _this = this;
-	// set a watchdog to avoid eventual locking:
 	var start = Date.now();
-	// wait for a few seconds
 	var reentrant = function () {
 		if (writer.readyState === writer.WRITING && Date.now() - start < 4000) {
 			setTimeout(reentrant, 100);
@@ -239,33 +283,39 @@ function pushFileCode(file, code, callback) {
  * @param {string} newCode The code to insert
  */
 function setupFileCode(file, newCode) {
-	var fileCode = getCode(item);
-	if (fileCode !== false && fileCode !== newCode) {
-		//Let the user choose whether to keep the local copy or the extension's copy
-		function tempListener(msg) {
-			if (msg.status === 'connected' && msg.action === 'chooseScript') {
-				var addToEditing = function() {
-					currentlyEditing.push(file);
-					getFileEntry(file, function(path) {
-						showConnectedNotification(file.name, path);
-					});
+	var fileCode;
+	getCode(file, function(code) {
+		fileCode = code;
+		if (fileCode !== false && fileCode !== newCode) {
+			//Let the user choose whether to keep the local copy or the extension's copy
+			function tempListener(msg) {
+				if (msg.status === 'connected' && msg.action === 'chooseScript') {
+					var addToEditing = function() {
+						currentlyEditing.push(file);
+						file.currentlyEditing = true;
+						getFileEntry(file, function(path) {
+							showConnectedNotification(file.name, path);
+						});
+					}
+					if (msg.choice === 'local') {
+						pushFileCode(file, newCode, addToEditing);
+					} else {
+						pushFileCode(file, fileCode, addToEditing);
+					}
+
 				}
-				if (msg.choice === 'local') {
-					pushFileCode(file, newCode, addToEditing);
-				} else {
-					pushFileCode(file, fileCode, addToEditing);
-				}
-				
 			}
+
+			file.connection.port.onMessage.addListener(tempListener);
+			file.connection.port.postMessage({
+				status: 'connected',
+				action: 'chooseScript',
+				local: newCode,
+				external: fileCode,
+				connectionId: file.connection.id
+			});
 		}
-		file.connection.port.onMessage.addListener(tempListener);
-		file.connection.port.postMessage({
-			status: 'connected',
-			action: 'chooseScript',
-			local: newCode,
-			external: fileCode
-		});
-	}
+	});
 }
 
 /**
@@ -276,24 +326,57 @@ function setupFileCode(file, newCode) {
  */
 function setupScript(connection, msg) {
 	var file;
+	if (connection.file) {
+		//Already has a file connected, clear that first
+		removeFromArray(currentlyEditing, connection.file);
+		connection.file.currentlyEditing = false;
+		connection.file.connection = null;
+		checkAliveConnections();
+	}
 	if (msg.id) {
 		file = files[msg.id];
 	}
 	if (file) {
 		//File already exists
+		file.connection = connection;
+		connection.file = file;
 		setupFileCode(file, msg.code);
+		connection.port.postMessage({
+			status: 'connected',
+			action: 'setupScript',
+			existed: true,
+			connectionId: connection.id
+		});
+		file.currentlyEditing = true;
+		currentlyEditing.push(file);
+		connection.fileConnected = true;
 	} else {
 		//Set up the file
 		file = {
-			name: msg.name,
 			code: msg.code
 		};
-		chooseFileLocation(msg.name, msg.code, function(id) {
+		chooseFileLocation(msg.name, msg.code, function (id) {
 			file.id = id;
-			file.connection = connection;
-			connection.file = file;
-			saveCurrentCode(false, file);
-			currentlyEditing.push(file);
+			getFileEntry(file, function(fileEntry) {
+				getFilePath(fileEntry, function(path) {
+					connection.port.postMessage({
+						status: 'connected',
+						action: 'setupScript',
+						existed: false,
+						id: id,
+						path: path,
+						connectionId: connection.id
+					});
+					file.id = id;
+					file.connection = connection;
+					file.fileEntry = fileEntry;
+					connection.file = file;
+					connection.fileConnected = true;
+					saveCurrentCode(false, file);
+					file.currentlyEditing = true;
+					currentlyEditing.push(file);
+				});
+			});
 		});
 	}
 }
@@ -309,6 +392,27 @@ function externalEditingMessageHandler(connection, msg) {
 	case 'setupScript':
 		setupScript(connection, msg);
 		break;
+		case 'refreshFromApp':
+			try {
+				if (connection.fileConnected) {
+					getCode(connection.file, function(code) {
+						connection.port.postMessage({
+							status: 'connected',
+							action: 'updateFromApp',
+							connectionId: connection.id,
+							code: code
+						});
+					});
+				}
+			} catch (e) {
+				//Port is no longer valid, remove it from currentlyEditing and from ports
+				if (connection.file.currentlyEditing) {
+					removeFromArray(currentlyEditing, connection.file);
+					connection.file.currentlyEditing = false;
+					delete connections[connection.id];
+				}
+			}
+			break;
 	}
 }
 
@@ -326,14 +430,17 @@ function checkAliveConnections() {
  * @param {object} item The item for which to update the code
  */
 function updateCode(item) {
-	var newCode = getCode(item);
-	if (newCode !== false && newCode !== item.code) {
-		item.connection.port.postMessage({
-			status: 'connected',
-			action: 'updateFromApp',
-			code: newCode
-		});
-	}
+	getCode(item, function(newCode) {
+		if (newCode !== false && newCode !== item.code) {
+			item.code = newCode;
+			item.connection.port.postMessage({
+				status: 'connected',
+				action: 'updateFromApp',
+				code: newCode,
+				connectionId: item.connection.id
+			});
+		}
+	});
 }
 
 /*
@@ -346,10 +453,9 @@ function updateCodeForAll() {
 	});
 }
 
-window.setInterval(function() {
-	checkAliveConnections();
-	updateCodeForAll();
-}, 3600000);
+window.setInterval(checkAliveConnections, 30000);
+
+window.setInterval(updateCodeForAll, 5000);
 
 /**
  * Handles the message sent by the extension
@@ -358,7 +464,6 @@ window.setInterval(function() {
  * @param {object} msg The message sent by the extension
  */
 function handleMessage(connection, msg) {
-	console.log(msg);
 	switch (msg.status) {
 		case 'connecting':
 			connectionHandler(connection, msg);
@@ -398,7 +503,7 @@ function createDeletionHandler(id) {
 
 var connectionObject;
 chrome.runtime.onConnectExternal.addListener(function(port) {
-	if (port.sender.id === 'iebkmapbaaghplacacpiagklbhenekhl') { //Change obnfehdnkjmbijebdllfcnccllcfceli') {
+	if (port.sender.id === 'obnfehdnkjmbijebdllfcnccllcfceli') { //Change iebkmapbaaghplacacpiagklbhenekhl') {
 		var connectionObject = {
 			connection: {
 				status: 'not connected',
