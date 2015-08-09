@@ -1,6 +1,7 @@
 ﻿///<reference path="../../references/_references.js"/>
 var files;
-chrome.storage.local.get(function(items) {
+chrome.storage.local.get(function (items) {
+	console.log(items);
 	files = items.files || {};
 });
 var currentlyEditing = [];
@@ -169,18 +170,19 @@ function saveCode(item, callback) {
 					}
 				}
 			}
-			if (filesCopy[item.id]) {
-				filesCopy[item.id].code = code;
-				files[item.id].code = code;
-			} else {
-				var newFile = {
-					code: code,
-					id: item.id
-				};
-				filesCopy[item.id] = newFile;
-				files[item.id] = newFile;
+			if (item.id !== undefined) {
+				if (filesCopy[item.id]) {
+					filesCopy[item.id].code = code;
+					files[item.id].code = code;
+				} else {
+					var newFile = {
+						code: code,
+						id: item.id
+					};
+					filesCopy[item.id] = newFile;
+					files[item.id] = newFile;
+				}
 			}
-			chrome.storage.local.set({ files: filesCopy });
 			callback(filesCopy);
 		}
 	});
@@ -188,7 +190,7 @@ function saveCode(item, callback) {
 
 function saveCurrentCode(all, item) {
 	if (all) {
-		var items = [];
+		var items = {};
 		var done = 0;
 		var length = currentlyEditing.length;
 		currentlyEditing.forEach(function(item) {
@@ -199,12 +201,16 @@ function saveCurrentCode(all, item) {
 				};
 				done++;
 				if (done === length) {
+					console.log('setting');
+					console.log(items);
 					chrome.storage.local.set({ files: items });
 				}
 			});
 		});
 	} else {
 		saveCode(item, function (files) {
+			console.log('setting');
+			console.log(files);
 			chrome.storage.local.set({ files: files });
 		});
 	}
@@ -284,9 +290,12 @@ function pushFileCode(file, code, callback) {
  */
 function setupFileCode(file, newCode) {
 	var fileCode;
-	getCode(file, function(code) {
+	console.log('setupFileCode');
+	console.log(newCode);
+	getCode(file, function (code) {
+		console.log(code);
 		fileCode = code;
-		if (fileCode !== false && fileCode !== newCode) {
+		if (fileCode && fileCode !== newCode) {
 			//Let the user choose whether to keep the local copy or the extension's copy
 			function tempListener(msg) {
 				if (msg.status === 'connected' && msg.action === 'chooseScript') {
@@ -374,6 +383,11 @@ function setupScript(connection, msg) {
 					connection.fileConnected = true;
 					saveCurrentCode(false, file);
 					file.currentlyEditing = true;
+					files.push({
+						id: file.id,
+						code: msg.code
+					});
+					chrome.storage.local.set({ files: files });
 					currentlyEditing.push(file);
 				});
 			});
