@@ -89,7 +89,9 @@ Polymer({
 			writer.onwriteend = _this.finishWriting;
 
 			var txt = window.content;
-			var blob = new Blob([txt], { type: 'text/javascript' });
+			console.log(txt);
+			var blob = new Blob([txt], { type: 'text/plain' });
+			console.log(blob);
 			writer.truncate(blob.size);
 			_this.waitForIO(writer, function() {
 				writer.seek(0);
