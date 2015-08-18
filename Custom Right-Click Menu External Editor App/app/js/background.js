@@ -346,7 +346,7 @@ function setupScript(connection, msg) {
 		console.log(file);
 		setupFileCode(file, msg.code, function() {
 			getFileEntry(file, function(fileEntry) {
-				getFilePath(fileEntry, function(path) {
+				getFilePath(fileEntry, function (path) {
 					connection.port.postMessage({
 						status: 'connected',
 						action: 'setupScript',
@@ -371,7 +371,7 @@ function setupScript(connection, msg) {
 		chooseFileLocation(msg.name, msg.code, function (id) {
 			file.id = id;
 			getFileEntry(file, function(fileEntry) {
-				getFilePath(fileEntry, function(path) {
+				getFilePath(fileEntry, function (path) {
 					connection.port.postMessage({
 						status: 'connected',
 						action: 'setupScript',
@@ -434,11 +434,8 @@ function externalEditingMessageHandler(connection, msg) {
 		}
 		break;
 	case 'disconnect':
-		if (connection.file.currentlyEditing) {
-			currentlyEditing = removeFromArray(currentlyEditing, connection.file);
-			connection.file.currentlyEditing = false;
-		}
-		delete connections[connection.id];
+		currentlyEditing = removeFromArray(currentlyEditing, connection.file);
+		connection.file.currentlyEditing = false;
 		break;
 	}
 }
@@ -530,7 +527,7 @@ function createDeletionHandler(id) {
 
 var connectionObject;
 chrome.runtime.onConnectExternal.addListener(function(port) {
-	if (port.sender.id === 'iebkmapbaaghplacacpiagklbhenekhl') { //Change obnfehdnkjmbijebdllfcnccllcfceli') {
+	if (port.sender.id === 'iebkmapbaaghplacacpiagklbhenekhl' || port.sender.id === 'obnfehdnkjmbijebdllfcnccllcfceli') { //obnfehdnkjmbijebdllfcnccllcfceli = laptop
 		var connectionObject = {
 			connection: {
 				status: 'not connected',
