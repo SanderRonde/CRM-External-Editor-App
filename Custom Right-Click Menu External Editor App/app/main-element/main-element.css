@@ -41,3 +41,10 @@ paper-button {
 	margin-bottom: 3px;
 	visibility: hidden;
 }
+
+#noDeleteMsg {
+	font-size: 80%;
+	color:rgb(255, 61, 27);
+	margin-top:-5px;
+	margin-bottom:5px;
+}

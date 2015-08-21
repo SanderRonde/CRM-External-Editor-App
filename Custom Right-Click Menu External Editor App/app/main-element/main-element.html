@@ -7,7 +7,8 @@
 		<link rel="stylesheet" href="main-element.css" />
 		<template>
 			<h2>Choose where to place the file</h2>
-			<br/>
+			<br hidden$="[[isMove]]"/>
+			<div id="noDeleteMsg" hidden$="[[!isMove]]">Remember that the file will not be deleted off your hard drive, only disabled!</div>
 			<div id="chooseLocation">
 				<div class="optionCont">
 					<div class="optionTxt">
@@ -18,7 +19,7 @@
 				</div>
 			</div>
 			<div id="errorTxt">Something went wrong, please select a different location</div>
-			<paper-button id="createFileButton" raised on-tap="createFile" disabled$="[[buttonDisabled]]">
+			<paper-button id="createFileButton" raised on-tap="finishWriting" disabled$="[[buttonDisabled]]">
 				Create File
 			</paper-button>
 		</template>

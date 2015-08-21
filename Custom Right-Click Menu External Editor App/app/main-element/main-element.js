@@ -18,6 +18,11 @@ Polymer({
 			value: true,
 			notify: true,
 			computed: 'disableButton(locationName)'
+		},
+		isMove: {
+			type: Boolean,
+			notify: true,
+			value: false
 		}
 	},
 
@@ -82,25 +87,8 @@ Polymer({
 		setTimeout(reentrant, 100);
 	},
 
-	createFile: function() {
-		var _this = this;
-		this.fileEntry.createWriter(function(writer) {
-			writer.onerror = _this.writerErrorHandler;
-			writer.onwriteend = _this.finishWriting;
-
-			var txt = window.content;
-			console.log(txt);
-			var blob = new Blob([txt], { type: 'text/plain' });
-			console.log(blob);
-			writer.truncate(blob.size);
-			_this.waitForIO(writer, function() {
-				writer.seek(0);
-				writer.write(blob);
-			});
-		}, _this.writerErrorHandler);
-	},
-
 	ready: function() {
 		window.el = this;
+		window.isMove && (this.isMove = true);
 	}
 });

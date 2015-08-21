@@ -1,7 +1,6 @@
 ﻿///<reference path="../../references/_references.js"/>
 var files;
 chrome.storage.local.get(function (items) {
-	console.log(items);
 	files = items.files || {};
 });
 var currentlyEditing = [];
@@ -27,9 +26,7 @@ var idNum = 0; //Id to keep track of all the connections, each connection gets t
 function removeFromArray(array, toRemove) {
 	var len = array.length;
 	for (var i = 0; i < len; i++) {
-		console.log(array[i]);
 		if (array[i] === toRemove) {
-			console.log('equal');
 			array.splice(i, 1);
 			break;
 		}
@@ -37,15 +34,15 @@ function removeFromArray(array, toRemove) {
 	return array;
 }
 
-function chooseFileLocation(name, content, callback) {
-	chrome.app.window.create('../html/chooseFile.html', {
+function chooseFileLocation(name, content, callback, isMove) {
+	chrome.app.window.create('../html/main.html', {
 		bounds: {
 			width: 550,
 			height: 195,
 			left: 100,
 			top: 500
 		},
-		id: 'chooseFileWindow',
+		id: 'mainWindow',
 		minWidth: 550,
 		minHeight: 195,
 		maxWidth: 550,
@@ -55,10 +52,11 @@ function chooseFileLocation(name, content, callback) {
 			type: 'chrome',
 			color: '#FFFFFF'
 		}
-	}, function(createdWindow) {
+	}, function (createdWindow) {
 		createdWindow.contentWindow.name = name;
 		createdWindow.contentWindow.content = content;
 		createdWindow.contentWindow.onFinish = callback;
+		createdWindow.contentWindow.isMove = isMove;
 	});
 }
 
@@ -101,7 +99,6 @@ function deleteDisconnected() {
 		if (connections.hasOwnProperty(connection)) {
 			if (connection.pinging) {
 				if (connections.file.currentlyEditing) {
-					console.log(currentlyEditing, connections.file);
 					currentlyEditing = removeFromArray(currentlyEditing, connections.file);
 					connections.file.currentlyEditing = false;
 					delete connections[connection.id];
@@ -130,7 +127,6 @@ function ping() {
 }
 
 function getFilePath(file, callback) {
-	console.log(file);
 	chrome.fileSystem.getDisplayPath(file, callback);
 }
 
@@ -138,8 +134,12 @@ function getFileEntry(item, callback) {
 	if (item.fileEntry) {
 		callback(item.fileEntry);
 	} else {
-		console.log(item.id);
-		chrome.fileSystem.restoreEntry(item.id, callback);
+		setTimeout(function () {
+			chrome.fileSystem.restoreEntry(item.id, function (fileEntry) {
+				item.fileEntry = fileEntry || null;
+				callback(fileEntry);
+			});
+		}, 500);
 	}
 }
 
@@ -150,13 +150,13 @@ function getFileEntry(item, callback) {
  * @returns {string} The item's current code
  */
 function getCode(item, callback) {
-	getFileEntry(item, function(fileEntry) {
-		fileEntry.file(function(file) {
+	getFileEntry(item, function (fileEntry) {
+		fileEntry.file(function (file) {
 			var reader = new FileReader();
-			reader.onerror = function() {
+			reader.onerror = function () {
 				callback(false);
 			}
-			reader.onload = function(e) {
+			reader.onload = function (e) {
 				callback(e.target.result);
 			};
 			reader.readAsText(file);
@@ -164,10 +164,8 @@ function getCode(item, callback) {
 	});
 }
 
-function saveCode(item, callback) {
-	console.log('saving');
-	console.log(item);
-	getCode(item, function(code) {
+function save(item, callback) {
+	getCode(item, function (code) {
 		if (code !== false) {
 			var filesCopy = {};
 			for (file in files) {
@@ -196,35 +194,47 @@ function saveCode(item, callback) {
 	});
 }
 
-function saveCurrentCode(all, item) {
+function saveCurrentCode(all, item, callback) {
 	if (all) {
 		var items = {};
 		var done = 0;
-		var length = currentlyEditing.length;
-		currentlyEditing.forEach(function(item) {
-			getCode(item, function(code) {
-				items[item.id] = {
-					id: item.id,
-					code: code
-				};
-				done++;
-				if (done === length) {
-					console.log('setting');
-					console.log(items);
-					chrome.storage.local.set({ files: items });
+		var filesArray = [];
+		for (var file in files) {
+			if (files.hasOwnProperty(file)) {
+				filesArray.push(files[file]);
+			}
+		}
+		var length = filesArray.length;
+		if (length) {
+			filesArray.forEach(function (item) {
+				try {
+					getCode(item, function (code) {
+						items[item.id] = {
+							id: item.id,
+							code: code
+						};
+						done++;
+						if (done === length) {
+							chrome.storage.local.set({ files: items });
+							callback && callback();
+						}
+					});
+				} catch (e) {
+					//Don't put them in the array
 				}
 			});
-		});
+		} else {
+			callback && callback();
+		}
 	} else {
-		saveCode(item, function (files) {
-			console.log('setting');
-			console.log(files);
+		save(item, function (files) {
 			chrome.storage.local.set({ files: files });
+			callback && callback();
 		});
 	}
 }
 
-function waitForIO (writer, callback) {
+function waitForIO(writer, callback) {
 	var _this = this;
 	var start = Date.now();
 	var reentrant = function () {
@@ -249,12 +259,12 @@ function waitForIO (writer, callback) {
  * @param {object} file The file for which to push the code
  * @param {string} code The code to push
  */
+//Call dit ff nadat ie de file maakt
 function pushFileCode(file, code, callback) {
-	console.log(file, code, callback);
 	file.createWriter(function (writer) {
 		writer.onwriteend = callback;
 
-		var blob = new Blob([code], { type: 'text/javascript' });
+		var blob = new Blob([code], { type: 'text/plain' });
 		writer.truncate(blob.size);
 		waitForIO(writer, function () {
 			writer.seek(0);
@@ -271,26 +281,21 @@ function pushFileCode(file, code, callback) {
  */
 function setupFileCode(file, newCode, callback) {
 	var fileCode;
-	getCode(file, function(code) {
-		console.log(code);
+	getCode(file, function (code) {
 		fileCode = code;
-		console.log(fileCode);
-		console.log(newCode);
 		if (fileCode && fileCode !== newCode) {
 			//Let the user choose whether to keep the local copy or the extension's copy
 			function tempListener(msg) {
-				console.log('message', msg);
 				if (msg.status === 'connected' && msg.action === 'chooseScript') {
-					console.log('oooow');
-					var addToEditing = function() {
+					var addToEditing = function () {
 						currentlyEditing.push(file);
 						file.currentlyEditing = true;
-						getFileEntry(file, function() {});
+						getFileEntry(file, function () { });
 					};
 					if (msg.code === fileCode) {
 						callback();
 					} else {
-						getFileEntry(file, function(fileEntry) {
+						getFileEntry(file, function (fileEntry) {
 							pushFileCode(fileEntry, msg.code, addToEditing);
 							callback();
 						});
@@ -298,7 +303,6 @@ function setupFileCode(file, newCode, callback) {
 				}
 			}
 
-			console.log('ayyyy');
 			file.connection.port.onMessage.addListener(tempListener);
 			file.connection.port.postMessage({
 				status: 'connected',
@@ -340,12 +344,9 @@ function setupScript(connection, msg) {
 		file.connection = null;
 
 		file.connection = connection;
-		console.log(file);
 		connection.file = file;
-		console.log(connection);
-		console.log(file);
-		setupFileCode(file, msg.code, function() {
-			getFileEntry(file, function(fileEntry) {
+		setupFileCode(file, msg.code, function () {
+			getFileEntry(file, function (fileEntry) {
 				getFilePath(fileEntry, function (path) {
 					connection.port.postMessage({
 						status: 'connected',
@@ -355,10 +356,7 @@ function setupScript(connection, msg) {
 						connectionId: connection.id
 					});
 					file.currentlyEditing = true;
-					console.log('PUSHING');
-					console.log(currentlyEditing);
 					currentlyEditing.push(file);
-					console.log(currentlyEditing);
 					connection.fileConnected = true;
 				});
 			});
@@ -370,8 +368,8 @@ function setupScript(connection, msg) {
 		};
 		chooseFileLocation(msg.name, msg.code, function (id) {
 			file.id = id;
-			getFileEntry(file, function(fileEntry) {
-				getFilePath(fileEntry, function (path) {
+			getFileEntry(file, function (fileEntry) {
+				getFilePath(fileEntry, function(path) {
 					connection.port.postMessage({
 						status: 'connected',
 						action: 'setupScript',
@@ -385,14 +383,16 @@ function setupScript(connection, msg) {
 					file.fileEntry = fileEntry;
 					connection.file = file;
 					connection.fileConnected = true;
-					saveCurrentCode(false, file);
-					file.currentlyEditing = true;
-					files[file.id] = {
-						id: file.id,
-						code: msg.code
-					};
-					chrome.storage.local.set({ files: files });
-					currentlyEditing.push(file);
+					pushFileCode(fileEntry, msg.code, function () {
+						saveCurrentCode(false, file);
+						file.currentlyEditing = true;
+						files[file.id] = {
+							id: file.id,
+							code: msg.code
+						};
+						chrome.storage.local.set({ files: files });
+						currentlyEditing.push(file);
+					});
 				});
 			});
 		});
@@ -407,36 +407,80 @@ function setupScript(connection, msg) {
  */
 function externalEditingMessageHandler(connection, msg) {
 	switch (msg.action) {
-	case 'setupScript':
-		setupScript(connection, msg);
-		break;
-	case 'refreshFromApp':
-		console.log('refresh from app', connection);
-		try {
-			if (connection.fileConnected) {
-				getCode(connection.file, function(code) {
-					connection.port.postMessage({
-						status: 'connected',
-						action: 'updateFromApp',
-						connectionId: connection.id,
-						code: code
+		case 'setupScript':
+			setupScript(connection, msg);
+			break;
+		case 'refreshFromApp':
+			try {
+				if (connection.fileConnected) {
+					getCode(connection.file, function (code) {
+						console.log('Updating code of connection ' + connection.id + ', ', connection, ' to code: \n\n' + code + '\n\nFrom code \n\n' + connection.file.code + '\n');
+						connection.port.postMessage({
+							status: 'connected',
+							action: 'updateFromApp',
+							connectionId: connection.id,
+							code: code
+						});
 					});
+				}
+			} catch (e) {
+				//Port is no longer valid, remove it from currentlyEditing and from ports
+				if (connection.file.currentlyEditing) {
+					currentlyEditing = removeFromArray(currentlyEditing, connection.file);
+					connection.file.currentlyEditing = false;
+					delete connections[connection.id];
+				}
+			}
+			break;
+		case 'disconnect':
+			currentlyEditing = removeFromArray(currentlyEditing, connection.file);
+			connection.file.currentlyEditing = false;
+			break;
+		case 'createNewFile':
+			//Delete from currently editing
+			currentlyEditing = removeFromArray(currentlyEditing, connection.file);
+			//Remove this file from chrome.storage.local
+			delete files[connection.file.id];
+
+			//Create the new file
+			saveCurrentCode(true, null, function () {
+				getCode(connection.file, function (code) {
+					chooseFileLocation(msg.name, code, function (id) {
+						var file = {
+							id: id,
+							code: code
+						};
+						setTimeout(function () {
+							getFileEntry(file, function (fileEntry) {
+								getFilePath(fileEntry, function (path) {
+									connection.port.postMessage({
+										status: 'connected',
+										action: 'setupScript',
+										existed: false,
+										id: id,
+										path: path,
+										connectionId: connection.id
+									});
+									file.id = id;
+									file.connection = connection;
+									file.fileEntry = fileEntry;
+									connection.file = file;
+									connection.fileConnected = true;
+									saveCurrentCode(false, file);
+									file.currentlyEditing = true;
+									files[file.id] = {
+										id: file.id,
+										code: msg.code
+									};
+									chrome.storage.local.set({ files: files });
+									currentlyEditing.push(file);
+								});
+							});
+						}, 0);
+					}, true);
 				});
-			}
-		} catch (e) {
-			console.log('exception', e);
-			//Port is no longer valid, remove it from currentlyEditing and from ports
-			if (connection.file.currentlyEditing) {
-				currentlyEditing = removeFromArray(currentlyEditing, connection.file);
-				connection.file.currentlyEditing = false;
-				delete connections[connection.id];
-			}
-		}
-		break;
-	case 'disconnect':
-		currentlyEditing = removeFromArray(currentlyEditing, connection.file);
-		connection.file.currentlyEditing = false;
-		break;
+			});
+			break;
 	}
 }
 
@@ -454,9 +498,10 @@ function checkAliveConnections() {
  * @param {object} item The item for which to update the code
  */
 function updateCode(item) {
-	getCode(item, function(newCode) {
+	getCode(item, function (newCode) {
 		if (newCode !== false && newCode !== item.code) {
 			item.code = newCode;
+			console.log('Updating code of connection ' + item.connection.id + ', ', item.connection, ' to code: \n\n' + newCode + '\n\nFrom code \n\n' + item.connection.file.code + '\n');
 			item.connection.port.postMessage({
 				status: 'connected',
 				action: 'updateFromApp',
@@ -472,7 +517,7 @@ function updateCode(item) {
  */
 function updateCodeForAll() {
 	saveCurrentCode(true);
-	currentlyEditing.forEach(function(item) {
+	currentlyEditing.forEach(function (item) {
 		updateCode(item);
 	});
 }
@@ -520,14 +565,15 @@ function createMessageHandler(connection) {
  * @returns {Function} A function that deletes the item
  */
 function createDeletionHandler(id) {
-	return function() {
+	return function () {
 		delete connections[id];
 	}
 }
 
 var connectionObject;
-chrome.runtime.onConnectExternal.addListener(function(port) {
-	if (port.sender.id === 'iebkmapbaaghplacacpiagklbhenekhl' || port.sender.id === 'obnfehdnkjmbijebdllfcnccllcfceli') { //obnfehdnkjmbijebdllfcnccllcfceli = laptop
+chrome.runtime.onConnectExternal.addListener(function (port) {
+	//TODO Will change when custom right-click menu is released
+	if ((port.sender.id === 'iebkmapbaaghplacacpiagklbhenekhl' || port.sender.id === 'obnfehdnkjmbijebdllfcnccllcfceli')) {
 		var connectionObject = {
 			connection: {
 				status: 'not connected',
@@ -537,6 +583,7 @@ chrome.runtime.onConnectExternal.addListener(function(port) {
 			id: ++idNum
 		};
 		connections[idNum] = connectionObject;
+		console.log('Connected, connection number: ' + idNum + ', connection object: ', connectionObject);
 		var handler = createMessageHandler(connectionObject);
 		port.onMessage.addListener(handler);
 		port.onDisconnect.addListener(createDeletionHandler(idNum));
