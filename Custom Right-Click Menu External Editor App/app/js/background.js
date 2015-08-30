@@ -34,7 +34,7 @@ function removeFromArray(array, toRemove) {
 	return array;
 }
 
-function chooseFileLocation(name, content, callback, isMove) {
+function chooseFileLocation(name, content, isCss, callback, isMove) {
 	chrome.app.window.create('../html/main.html', {
 		bounds: {
 			width: 550,
@@ -57,14 +57,15 @@ function chooseFileLocation(name, content, callback, isMove) {
 		createdWindow.contentWindow.content = content;
 		createdWindow.contentWindow.onFinish = callback;
 		createdWindow.contentWindow.isMove = isMove;
+		createdWindow.contentWindow.isCss = isCss;
 	});
 }
 
 /*
  * Handles the job of connecting to the extension
  * 
- * @param {object} connection The connection on which the message was sent
- * @param {object} msg The message sent by the extension
+ * @param {Object} connection - The connection on which the message was sent
+ * @param {Object} msg - The message sent by the extension
  */
 function connectionHandler(connection, msg) {
 	switch (msg.stage) {
@@ -146,7 +147,7 @@ function getFileEntry(item, callback) {
 /**
  * Gets the code for given item
  * 
- * @param {object} item The item to check for
+ * @param {Object} item - The item to check for
  * @returns {string} The item's current code
  */
 function getCode(item, callback) {
@@ -256,8 +257,8 @@ function waitForIO(writer, callback) {
 /*
  * Pushes the code to a file's contents
  * 
- * @param {object} file The file for which to push the code
- * @param {string} code The code to push
+ * @param {Object} file - The file for which to push the code
+ * @param {string} code - The code to push
  */
 //Call dit ff nadat ie de file maakt
 function pushFileCode(file, code, callback) {
@@ -276,17 +277,20 @@ function pushFileCode(file, code, callback) {
 /**
  * Sets up the code for the file, letting the user choose which to keep
  * 
- * @param {object} file The file for which to update the code
- * @param {string} newCode The code to insert
+ * @param {Object} file - The file for which to update the code
+ * @param {string} newCode - The code to insert
  */
 function setupFileCode(file, newCode, callback) {
 	var fileCode;
+	console.log(file);
 	getCode(file, function (code) {
+		console.log(newCode);
+		console.log(code);
 		fileCode = code;
 		if (fileCode && fileCode !== newCode) {
 			//Let the user choose whether to keep the local copy or the extension's copy
 			function tempListener(msg) {
-				if (msg.status === 'connected' && msg.action === 'chooseScript') {
+				if (msg.status === 'connected' && msg.action === 'chooseFile') {
 					var addToEditing = function () {
 						currentlyEditing.push(file);
 						file.currentlyEditing = true;
@@ -306,7 +310,7 @@ function setupFileCode(file, newCode, callback) {
 			file.connection.port.onMessage.addListener(tempListener);
 			file.connection.port.postMessage({
 				status: 'connected',
-				action: 'chooseScript',
+				action: 'chooseFile',
 				local: newCode,
 				external: fileCode,
 				connectionId: file.connection.id
@@ -320,10 +324,11 @@ function setupFileCode(file, newCode, callback) {
 /**
  * Initialises the script with its connection and external file
  * 
- * @param {object} connection The connection on which the message was sent
- * @param {object} msg The message sent by the extension
+ * @param {Object} connection - - The connection on which the message was sent
+ * @param {Object} msg - - The message sent by the extension
+ * @param {boolean} isCss - - Whether the item is a stylesheet, alternative is a script
  */
-function setupScript(connection, msg) {
+function setupFile(connection, msg, isCss) {
 	var file;
 	if (connection.file) {
 		//Already has a file connected, clear that first
@@ -332,9 +337,11 @@ function setupScript(connection, msg) {
 		connection.file.connection = null;
 		checkAliveConnections();
 	}
+	console.log(msg.id);
 	if (msg.id) {
 		file = files[msg.id];
 	}
+	console.log(file);
 	if (file) {
 		//File already exists
 
@@ -350,7 +357,7 @@ function setupScript(connection, msg) {
 				getFilePath(fileEntry, function (path) {
 					connection.port.postMessage({
 						status: 'connected',
-						action: 'setupScript',
+						action: (isCss ? 'setupStylesheet' : 'setupScript'),
 						existed: true,
 						path: path,
 						connectionId: connection.id
@@ -366,13 +373,13 @@ function setupScript(connection, msg) {
 		file = {
 			code: msg.code
 		};
-		chooseFileLocation(msg.name, msg.code, function (id) {
+		chooseFileLocation(msg.name, msg.code, isCss, function (id) {
 			file.id = id;
 			getFileEntry(file, function (fileEntry) {
 				getFilePath(fileEntry, function(path) {
 					connection.port.postMessage({
 						status: 'connected',
-						action: 'setupScript',
+						action: (isCss ? 'setupStylesheet' : 'setupScript'),
 						existed: false,
 						id: id,
 						path: path,
@@ -402,13 +409,16 @@ function setupScript(connection, msg) {
 /**
  * Handles any messages related to the external editing of a script
  * 
- * @param {object} connection The connection on which the message was sent
- * @param {object} msg The message sent by the extension
+ * @param {Object} connection - The connection on which the message was sent
+ * @param {Object} msg - The message sent by the extension
  */
 function externalEditingMessageHandler(connection, msg) {
 	switch (msg.action) {
 		case 'setupScript':
-			setupScript(connection, msg);
+			setupFile(connection, msg, false);
+			break;
+		case 'setupStylesheet':
+			setupFile(connection, msg, true);
 			break;
 		case 'refreshFromApp':
 			try {
@@ -495,7 +505,7 @@ function checkAliveConnections() {
 /*
  * Updates the code for given item
  * 
- * @param {object} item The item for which to update the code
+ * @param {Object} item - The item for which to update the code
  */
 function updateCode(item) {
 	getCode(item, function (newCode) {
@@ -529,8 +539,8 @@ window.setInterval(updateCodeForAll, 5000);
 /**
  * Handles the message sent by the extension
  * 
- * @param {object} connection The connection on which the message was sent
- * @param {object} msg The message sent by the extension
+ * @param {Object} connection - - The connection on which the message was sent
+ * @param {Object} msg - - The message sent by the extension
  */
 function handleMessage(connection, msg) {
 	switch (msg.status) {
@@ -549,7 +559,7 @@ function handleMessage(connection, msg) {
 /**
  * Creates a handler for the parsing of a message
  * 
- * @param {Object} connection The connection to add
+ * @param {Object} connection - The connection to add
  * @returns {Function} A function that handles a message being passed to it
  */
 function createMessageHandler(connection) {
@@ -561,7 +571,7 @@ function createMessageHandler(connection) {
 /**
  * Creates a handler for the deletion of a connection from the list
  * 
- * @param {Number} id The id given to the connection
+ * @param {Number} id - The id given to the connection
  * @returns {Function} A function that deletes the item
  */
 function createDeletionHandler(id) {

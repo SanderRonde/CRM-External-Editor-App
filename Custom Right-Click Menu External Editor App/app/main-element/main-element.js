@@ -46,7 +46,7 @@ Polymer({
 			suggestedName: window.name,
 			accepts: [
 				{
-					extensions: ['js']
+					extensions: (window.isCss ? ['css'] : ['js'])
 				}
 			]
 		}, function (fileEntry) {
