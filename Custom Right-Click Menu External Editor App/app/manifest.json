@@ -1,11 +1,13 @@
 ﻿{
 	"name": "CRM External Editor App",
 	"description": "Allows you to edit your Custom Right-Click Menu script in an editor of your choice.",
-	"version": "0.9",
+	"version": "0.9.1",
 	"manifest_version": 2,
 
 	"icons": {
-		"128": "icons/ChromeApp.png"
+		"128": "icon-large.png",
+		"48": "icon-small.png",
+		"16": "icon-supersmall.png"
 	},
 
 	"permissions": [

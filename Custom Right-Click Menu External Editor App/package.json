@@ -1,7 +1,7 @@
 {
-  "name": "CRMExteralEditorApp",
+  "name": "crm-external-editor-app",
   "description": "Allows you to edit your Custom Right-Click Menu script in an editor of your choice.",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "license": "MIT",
   "repository": {
     "type": "git",
