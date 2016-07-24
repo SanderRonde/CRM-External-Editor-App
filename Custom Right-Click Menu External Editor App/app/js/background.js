@@ -583,7 +583,7 @@ function createDeletionHandler(id) {
 var connectionObject;
 chrome.runtime.onConnectExternal.addListener(function (port) {
 	//TODO Will change when custom right-click menu is released
-	if ((port.sender.id === 'iebkmapbaaghplacacpiagklbhenekhl' || port.sender.id === 'obnfehdnkjmbijebdllfcnccllcfceli')) {
+	if ((port.sender.id === 'onnbmgmepodkilcbdodhfepllfmafmlj' || port.sender.id === 'fenehceojjegleckckhppcckanifnajg')) {
 		var connectionObject = {
 			connection: {
 				status: 'not connected',
