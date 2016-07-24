@@ -34,6 +34,27 @@ function removeFromArray(array, toRemove) {
 	return array;
 }
 
+chrome.app.runtime.onLaunched.addListener(function() {
+	chrome.app.window.create('../html/notice.html', {
+		bounds: {
+			width: 550,
+			height: 195,
+			left: 100,
+			top: 500
+		},
+		id: 'mainWindow',
+		minWidth: 550,
+		minHeight: 195,
+		maxWidth: 550,
+		maxHeight: 195,
+		resizable: false,
+		frame: {
+			type: 'chrome',
+			color: '#FFFFFF'
+		}
+	});
+});
+
 function chooseFileLocation(name, content, isCss, callback, isMove) {
 	chrome.app.window.create('../html/main.html', {
 		bounds: {

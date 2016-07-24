@@ -59,7 +59,7 @@
 		processhtml: {
 			elements: {
 				files: {
-					'build/main.html': ['app/html/main.html']
+					'build/html/main.html': ['app/html/main.html']
 				}
 			}
 		},
@@ -107,6 +107,16 @@
 						cwd: 'app/',
 						src: ['LICENSE.txt', 'manifest.json'],
 						dest: 'build/'
+					}, {
+						expand: true,
+						cwd: 'app/html/',
+						src: ['notice.html'],
+						dest: 'build/html/'
+					}, {
+						expand: true,
+						cwd: 'app/',
+						src: ['elements.html'],
+						dest: 'build/html/'
 					}
 				]
 			}
