@@ -35,7 +35,8 @@ function removeFromArray(array, toRemove) {
 }
 
 function chooseFileLocation(name, content, isCss, callback, isMove) {
-	chrome.app.window.create('../html/main.html', {
+	console.log('creating?');
+	chrome.app.window.create('/html/main.html', {
 		bounds: {
 			width: 550,
 			height: 195,
@@ -96,7 +97,7 @@ function connectionHandler(connection, msg) {
  * Deletes any connections that did not respond to the ping
  */
 function deleteDisconnected() {
-	for (connection in connections) {
+	for (var connection in connections) {
 		if (connections.hasOwnProperty(connection)) {
 			if (connection.pinging) {
 				if (connections.file.currentlyEditing) {
@@ -113,7 +114,7 @@ function deleteDisconnected() {
  * Pings any current connections and sees if they are still live
  */
 function ping() {
-	for (connection in connections) {
+	for (var connection in connections) {
 		if (connections.hasOwnProperty(connection)) {
 			if (connection.connected) {
 				connection.postMessage({
@@ -169,7 +170,7 @@ function save(item, callback) {
 	getCode(item, function (code) {
 		if (code !== false) {
 			var filesCopy = {};
-			for (file in files) {
+			for (var file in files) {
 				if (files.hasOwnProperty(file)) {
 					filesCopy[file.id] = {
 						code: file.code,
@@ -282,10 +283,7 @@ function pushFileCode(file, code, callback) {
  */
 function setupFileCode(file, newCode, callback) {
 	var fileCode;
-	console.log(file);
 	getCode(file, function (code) {
-		console.log(newCode);
-		console.log(code);
 		fileCode = code;
 		if (fileCode && fileCode !== newCode) {
 			//Let the user choose whether to keep the local copy or the extension's copy
@@ -341,7 +339,6 @@ function setupFile(connection, msg, isCss) {
 	if (msg.id) {
 		file = files[msg.id];
 	}
-	console.log(file);
 	if (file) {
 		//File already exists
 
@@ -455,7 +452,7 @@ function externalEditingMessageHandler(connection, msg) {
 			//Create the new file
 			saveCurrentCode(true, null, function () {
 				getCode(connection.file, function (code) {
-					chooseFileLocation(msg.name, code, function (id) {
+					chooseFileLocation(msg.name, code, msg.isCss, function (id) {
 						var file = {
 							id: id,
 							code: code
@@ -598,4 +595,26 @@ chrome.runtime.onConnectExternal.addListener(function (port) {
 		port.onMessage.addListener(handler);
 		port.onDisconnect.addListener(createDeletionHandler(idNum));
 	}
+});
+
+chrome.app.runtime.onLaunched.addListener(function() {
+	chrome.app.window.create('/html/notice.html',
+	{
+		bounds: {
+			width: 550,
+			height: 130,
+			left: 100,
+			top: 500
+		},
+		id: 'noticeWindow',
+		minWidth: 550,
+		minHeight: 130,
+		maxWidth: 550,
+		maxHeight: 130,
+		resizable: false,
+		frame: {
+			type: 'chrome',
+			color: '#FFFFFF'
+		}
+	});
 });
