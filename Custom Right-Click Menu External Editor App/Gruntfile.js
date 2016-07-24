@@ -1,15 +1,79 @@
 ﻿module.exports = function(grunt) {
 	grunt.initConfig({
 		pkg: grunt.file.readJSON('package.json'),
+		replace: {
+			roboto: {
+				src: 'app/bower_components_inline/paper-styles/typography.html',
+				overwrite: true,
+				replacements: [
+					{
+						from: '<link rel="import" href="../font-roboto/roboto.html">',
+						to: '<link rel="stylesheet" href="../../../fonts/fonts.css" />'
+					}
+				]
+			},
+			elements: {
+				src: ['app/html/elements.html'],
+				dest: 'app/html/elementsInline.html',
+				replacements: [
+					{
+						from: 'bower_components_crisp',
+						to: 'bower_components_inline'
+					}, {
+						from: 'main-element.html',
+						to: 'main-element-no-js.html'
+					}
+				]
+			},
+			noscript: {
+				src: ['app/main-element/main-element.html'],
+				dest: 'app/main-element/main-element-no-js.html',
+				replacements: [
+					{
+						from: '<script src="main-element.js"></script>',
+						to: ''
+					}
+				]
+			}
+		},
+		vulcanize: {
+			default: {
+				options: {
+					stripComments: true,
+					csp: 'elements.js'
+				},
+				files: [
+					{
+						src: ['app/html/elementsInline.html'],
+						dest: 'build/elements.html'
+					}
+				]
+			}
+		},
+		concat: {
+			build: {
+				src: ['build/elements.js', 'app/main-element/main-element.js'],
+				dest: 'build/elements.js'
+			}
+		},
+		processhtml: {
+			elements: {
+				files: {
+					'build/main.html': ['app/html/main.html']
+				}
+			}
+		},
 		minified: {
 			files: {
 				src: [
-					'app/js/*.js'
+					'app/js/*.js',
+					'build/elements.js'
 				],
 				dest: 'build/js/'
 			}
 		},
 		clean: {
+			build: ['app/html/elementsInline.html', 'app/main-element/main-element-no-js.html', 'build/elements.js'],
 			cleanFolder: ['build/**.*', 'build/*', 'app/html/elementsInline.html', 'app/main-element/main-element-no-js.html', 'build/elements.js']
 		},
 		cssmin: {
@@ -42,16 +106,6 @@
 						expand: true,
 						cwd: 'app/',
 						src: ['LICENSE.txt', 'manifest.json'],
-						dest: 'build/'
-					}, {
-						expand: true,
-						cwd: 'app/',
-						src: ['html/main.html', 'html/notice.html'],
-						dest: 'build/'
-					}, {
-						expand: true,
-						cwd: 'app/',
-						src: '*.png',
 						dest: 'build/'
 					}
 				]
@@ -99,6 +153,6 @@
 	grunt.loadNpmTasks('grunt-contrib-concat');
 	grunt.loadNpmTasks('grunt-processhtml');
 
-	grunt.registerTask('build', ['clean:cleanFolder', 'minified', 'cssmin', 'copy', 'usebanner', 'zip']);
+	grunt.registerTask('build', ['clean:cleanFolder', 'replace', 'vulcanize', 'concat', 'processhtml', 'minified', 'clean:build', 'cssmin', 'copy', 'usebanner', 'zip']);
 	grunt.registerTask('clear', ['clean:cleanFolder']);
 }
