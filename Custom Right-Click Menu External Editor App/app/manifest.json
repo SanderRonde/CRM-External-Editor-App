@@ -1,7 +1,7 @@
 ﻿{
 	"name": "CRM External Editor App",
 	"description": "Allows you to edit your Custom Right-Click Menu script in an editor of your choice.",
-	"version": "0.9.2",
+	"version": "1.0.0",
 	"manifest_version": 2,
 
 	"icons": {
@@ -13,8 +13,13 @@
 	"permissions": [
 		"app.window",
 		"notifications",
-		"storage",
-		{"fileSystem": ["write", "retainEntries", "directory"]} 
+		"storage", {
+			"fileSystem": [
+				"write", 
+				"retainEntries", 
+				"directory"
+			]
+		} 
 	],
 
 	"app": {
