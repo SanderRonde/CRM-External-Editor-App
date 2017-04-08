@@ -149,20 +149,28 @@
 				src: ['build/**', '!build/CRMExternalEditorApp.zip'],
 				dest: 'build/CRMExternalEditorApp.zip'
 			}
+		},
+		mkdir: {
+			all: {
+				options: {
+					create: ['build']
+				}
+			}
 		}
 	});
 
-	grunt.loadNpmTasks('grunt-contrib-copy');
-	grunt.loadNpmTasks('grunt-minified');
-	grunt.loadNpmTasks('grunt-contrib-cssmin');
 	grunt.loadNpmTasks('grunt-banner');
-	grunt.loadNpmTasks('grunt-zip');
-	grunt.loadNpmTasks('grunt-vulcanize');
 	grunt.loadNpmTasks('grunt-contrib-clean');
-	grunt.loadNpmTasks('grunt-text-replace');
 	grunt.loadNpmTasks('grunt-contrib-concat');
+	grunt.loadNpmTasks('grunt-contrib-copy');
+	grunt.loadNpmTasks('grunt-contrib-cssmin');
+	grunt.loadNpmTasks('grunt-minified');
+	grunt.loadNpmTasks('grunt-mkdir');
+	grunt.loadNpmTasks('grunt-text-replace');
 	grunt.loadNpmTasks('grunt-processhtml');
+	grunt.loadNpmTasks('grunt-vulcanize');
+	grunt.loadNpmTasks('grunt-zip');
 
-	grunt.registerTask('build', ['clean:cleanFolder', 'replace', 'vulcanize', 'concat', 'processhtml', 'minified', 'clean:build', 'cssmin', 'copy', 'usebanner', 'zip']);
+	grunt.registerTask('build', ['clean:cleanFolder', 'mkdir', 'replace', 'vulcanize', 'concat', 'processhtml', 'minified', 'clean:build', 'cssmin', 'copy', 'usebanner', 'zip']);
 	grunt.registerTask('clear', ['clean:cleanFolder']);
 }
