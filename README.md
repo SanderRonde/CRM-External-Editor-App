@@ -1,9 +1,12 @@
+# Deprecated
+This project has been deprecated as [chrome apps have been disabled](https://blog.chromium.org/2016/08/from-chrome-apps-to-web.html).
+
 # CRM-External-Editor-App
 An app to go along with Custom Right-Click Menu (https://github.com/SanderRonde/CustomRightClickMenu) that allows you to edit
 files externally in your own editor instead of the extension's editor.
 See the extension for more information.
 
-#License
+# License
 ```
 The MIT License (MIT)
 
